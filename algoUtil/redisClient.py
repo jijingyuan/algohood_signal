@@ -65,8 +65,27 @@ class RedisClient:
             logger.error(e)
             return False
 
-    def get_ts_batch(self, _db, _key, _start_ts, _end_ts, _limit=None) -> list or None:
-        pass
+    def get_ts_batch_by_key(self, _db, _key, _start_ts, _end_ts, _limit=None) -> list or None:
+        try:
+            self.client.select(_db)
+            ts = self.client.ts()
+            batch = ts.range(_key, _start_ts, _end_ts, count=_limit) or {}
+            return batch
+
+        except Exception as e:
+            logger.error(e)
+            return
+
+    def get_ts_batch_by_labels(self, _db, _labels, _start_ts, _end_ts, _limit=None) -> list or None:
+        try:
+            self.client.select(_db)
+            ts = self.client.ts()
+            batch = ts.mrange(_start_ts, _end_ts, filters=_labels, count=_limit) or []
+            return batch
+
+        except Exception as e:
+            logger.error(e)
+            return
 
     def add_ts_batch(self, _db, _key, _batch: list):
         try:
@@ -76,7 +95,7 @@ class RedisClient:
                 pipe.multi()
                 for data in _batch:
                     pipe.ts().add(_key, data[0], data[1])
-                results = pipe.execute()
+                pipe.execute()
 
             return True
 
