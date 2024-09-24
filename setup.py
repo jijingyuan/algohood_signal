@@ -15,6 +15,7 @@ setup(
     description="research tools for signal analyzing in quantitative trading",  # 包的简短描述
     packages=find_packages(),  # 自动发现包目录
     install_requires=[
-        'redis==5.0.8'
+        'redis==5.0.8',
+        "influxdb-client==1.46.0"
     ],
 )
