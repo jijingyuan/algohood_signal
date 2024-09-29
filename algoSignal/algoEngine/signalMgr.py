@@ -46,7 +46,7 @@ class SignalMgr:
 
         if self.signals:
             if _save_signals:
-                pd.DataFrame(self.signals).to_csv('../RookieFile/signals.csv')
+                pd.DataFrame(self.signals).to_csv('../algoFile/signals.csv')
             else:
                 return self.signals
 
