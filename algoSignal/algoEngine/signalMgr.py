@@ -4,45 +4,46 @@
 @File: signalMgr.py
 @Author: Jingyuan
 """
-import asyncio
 import importlib
+import time
 import traceback
+from concurrent.futures import wait
 from itertools import groupby
 
 import pandas as pd
 
 from .dataMgr import DataMgr
-from ..algoUtil.loggerUtil import generate_logger
-
-logger = generate_logger(level='DEBUG')
+from ..algoConfig.loggerConfig import logger
+from ..algoConfig.threadPoolConfig import pool
 
 
 class SignalMgr:
 
-    def __init__(self, _author, _method_name, _method_param):
-        self.signal_mgr = self.get_signal_method(_author, _method_name, _method_param)
-        self.data_mgr = DataMgr()
+    def __init__(self, _method_name, _method_param, _data_mgr: DataMgr):
+        self.signal_mgr = self.get_signal_method(_method_name, _method_param)
+        self.data_mgr = _data_mgr
         self.cache = []
         self.signals = []
 
     @staticmethod
-    def get_signal_method(_author, _method_name, _method_param):
+    def get_signal_method(_method_name, _method_param):
         if _method_param is None:
             _method_param = {}
-        module = importlib.import_module('algohood_{}.signal_{}'.format(_author.lower(), _method_name))
+        module = importlib.import_module('algoStrategy.signal{}'.format(_method_name))
         cls_method = getattr(module, _method_name)
         if cls_method is None:
             raise Exception('Unknown Method: {}'.format(_method_name))
         instance = cls_method(**_method_param)
         return instance
 
-    async def start_task(self, _lag, _symbols, _start_timestamp, _end_timestamp, _save_signals):
+    def start_task(self, _lag, _symbols, _start_timestamp, _end_timestamp, _save_signals):
         tasks = [
-            self.data_mgr.load_data(_symbols, _start_timestamp, _end_timestamp),
-            self.handle_data(_lag)
+            pool.submit(self.data_mgr.load_data, *(_symbols, _start_timestamp, _end_timestamp)),
+            pool.submit(self.handle_data, *(_lag,))
         ]
 
-        await asyncio.gather(*tasks)
+        wait(tasks)
+
         if self.signals:
             if _save_signals:
                 pd.DataFrame(self.signals).to_csv('../RookieFile/signals.csv')
@@ -56,17 +57,17 @@ class SignalMgr:
         g = groupby(tmp, lambda x: round(int(x[0] / _lag) * _lag, keep))
         return {k: list(v) for k, v in g}
 
-    async def handle_data(self, _lag):
+    def handle_data(self, _lag):
         while True:
             try:
-                data = await self.data_mgr.get_data()
+                data = self.data_mgr.get_data()
                 if data is None:
                     return
 
                 current_data = self.cache + data
                 if _lag is None:
                     for data in current_data:
-                        signals = self.signal_mgr.generate_targets([data])
+                        signals = self.signal_mgr.generate_signals([data])
                         if signals:
                             adj_signals = {'signal_{}'.format(k): v for k, v in signals.items()}
                             self.signals.append({**adj_signals, 'signal_timestamp': data[-1]['rank_timestamp']})
@@ -79,14 +80,14 @@ class SignalMgr:
                             last_ticks = ticks
                             continue
 
-                        signals = self.signal_mgr.generate_targets([v[1] for v in last_ticks])
+                        signals = self.signal_mgr.generate_signals([v[1] for v in last_ticks])
                         if signals:
                             adj_signals = {'signal_{}'.format(k): v for k, v in signals.items()}
                             self.signals.append({**adj_signals, 'signal_timestamp': cut_timestamp})
 
                         last_cut = cut_timestamp
                         last_ticks = ticks
-                        await asyncio.sleep(0)
+                        time.sleep(0)
 
                     self.cache = [v[1] for v in last_ticks]
 
