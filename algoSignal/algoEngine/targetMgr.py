@@ -15,9 +15,9 @@ from algoUtils.dateUtil import timestamp_local_datetime
 
 class TargetMgr:
 
-    def __init__(self, _method_name, _method_param, _data_mgr: DataMgr):
+    def __init__(self, _method_name, _method_param, _data_type):
         self.target_mgr = self.get_target_method(_method_name, _method_param)
-        self.data_mgr = _data_mgr
+        self.data_mgr = DataMgr(_data_type)
 
     @staticmethod
     def get_target_method(_method_name, _method_param):
@@ -30,12 +30,14 @@ class TargetMgr:
         instance = cls_method(**_method_param)
         return instance
 
-    def handle_signals(self, _signals, _symbols, _forward_window):
+    def handle_signals(self, _signals, _forward_window, _file_name):
         all_targets = []
+        self.data_mgr.init_data_mgr()
         for signal in _signals:
+            symbol = signal['signal_symbol']
             start_timestamp = signal['signal_timestamp']
             end_timestamp = start_timestamp + _forward_window
-            data = self.data_mgr.get_trades_given_start_end(_symbols, start_timestamp, end_timestamp)
+            data = self.data_mgr.get_all_data_by_symbol(symbol, start_timestamp, end_timestamp)
             if not data:
                 all_targets.append(signal)
             else:
@@ -45,4 +47,4 @@ class TargetMgr:
 
             logger.info('{} finished'.format(timestamp_local_datetime(start_timestamp)))
 
-        pd.DataFrame(all_targets).to_csv('../RookieFile/targets.csv')
+        pd.DataFrame(all_targets).to_csv('../algoFile/{}.csv'.format(_file_name))

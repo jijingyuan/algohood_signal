@@ -19,9 +19,9 @@ from ..algoConfig.threadPoolConfig import pool
 
 class SignalMgr:
 
-    def __init__(self, _method_name, _method_param, _data_mgr: DataMgr):
+    def __init__(self, _method_name, _method_param, _data_type):
         self.signal_mgr = self.get_signal_method(_method_name, _method_param)
-        self.data_mgr = _data_mgr
+        self.data_mgr = DataMgr(_data_type)
         self.cache = []
         self.signals = []
 
@@ -36,7 +36,8 @@ class SignalMgr:
         instance = cls_method(**_method_param)
         return instance
 
-    def start_task(self, _lag, _symbols, _start_timestamp, _end_timestamp, _save_signals):
+    def start_task(self, _lag, _symbols, _start_timestamp, _end_timestamp, _file_name):
+        self.data_mgr.init_data_mgr()
         tasks = [
             pool.submit(self.data_mgr.load_data, *(_symbols, _start_timestamp, _end_timestamp)),
             pool.submit(self.handle_data, *(_lag,))
@@ -45,10 +46,7 @@ class SignalMgr:
         wait(tasks)
 
         if self.signals:
-            if _save_signals:
-                pd.DataFrame(self.signals).to_csv('../algoFile/signals.csv')
-            else:
-                return self.signals
+            pd.DataFrame(self.signals).to_csv('../algoFile/{}.csv'.format(_file_name))
 
     @staticmethod
     def reshape(_ticks, _lag):
@@ -67,9 +65,10 @@ class SignalMgr:
                 current_data = self.cache + data
                 if _lag is None:
                     for data in current_data:
-                        signals = self.signal_mgr.generate_signals([data])
-                        if signals:
-                            adj_signals = {'signal_{}'.format(k): v for k, v in signals.items()}
+                        signals = self.signal_mgr.generate_signals([data]) or []
+                        for signal in signals:
+                            self.check_fields(signal)
+                            adj_signals = {'signal_{}'.format(k): v for k, v in signal.items()}
                             self.signals.append({**adj_signals, 'signal_timestamp': data[-1]['rank_timestamp']})
 
                 else:
@@ -80,9 +79,10 @@ class SignalMgr:
                             last_ticks = ticks
                             continue
 
-                        signals = self.signal_mgr.generate_signals([v[1] for v in last_ticks])
-                        if signals:
-                            adj_signals = {'signal_{}'.format(k): v for k, v in signals.items()}
+                        signals = self.signal_mgr.generate_signals([v[1] for v in last_ticks]) or []
+                        for signal in signals:
+                            self.check_fields(signal)
+                            adj_signals = {'signal_{}'.format(k): v for k, v in signal.items()}
                             self.signals.append({**adj_signals, 'signal_timestamp': cut_timestamp})
 
                         last_cut = cut_timestamp
@@ -93,3 +93,11 @@ class SignalMgr:
 
             except Exception:
                 logger.error(traceback.format_exc())
+
+    @staticmethod
+    def check_fields(_signal):
+        assert 'bind_id' in _signal
+        assert 'symbol' in _signal
+        assert 'action' in _signal
+        assert 'position' in _signal
+        assert 'executing_mod' in _signal

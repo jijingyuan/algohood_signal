@@ -19,6 +19,7 @@ from ..algoConfig.threadPoolConfig import pool
 
 
 class DataMgr:
+    NODE_LIMIT = 200
 
     def __init__(self, _data_type):
         self.data_type = _data_type
@@ -33,23 +34,18 @@ class DataMgr:
     def init_data_mgr(self):
         self.redis_cluster.init_cluster(_is_localhost=is_localhost)
 
-    def get_trades_given_start_end(self, _symbols, _start_ts, _end_ts):
-        if isinstance(_symbols, str):
-            symbol_keys = ['{}|{}'.format(_symbols, self.data_type)]
-        else:
-            symbol_keys = ['{}|{}'.format(v, self.data_type) for v in _symbols]
-
+    def get_all_data_by_symbol(self, _symbol, _start_ts, _end_ts):
+        symbol_key = '{}|{}'.format(_symbol, self.data_type)
         all_data = []
-        for symbol_key in symbol_keys:
-            cut_timestamp = _start_ts
-            while True:
-                data = self.get_data_by_symbol_key(symbol_key, cut_timestamp)
-                if data[-1]['rank_timestamp'] > _end_ts:
-                    all_data.extend([v for v in data if v['rank_timestamp'] <= _end_ts])
-                    break
-                else:
-                    all_data.extend(data)
-                    cut_timestamp = data[-1]['rank_timestamp'] + 0.000001
+        cut_timestamp = _start_ts
+        while True:
+            data = self.get_data_by_symbol_key(symbol_key, cut_timestamp)
+            if data[-1]['rank_timestamp'] > _end_ts:
+                all_data.extend([v for v in data if v['rank_timestamp'] <= _end_ts])
+                break
+            else:
+                all_data.extend(data)
+                cut_timestamp = data[-1]['rank_timestamp'] + 0.000001
 
         return sorted(all_data, key=lambda x: x['rank_timestamp'])
 
@@ -102,7 +98,7 @@ class DataMgr:
 
         return sorted([v for v in all_data if v['rank_timestamp'] <= last_ts], key=lambda x: x['rank_timestamp'])
 
-    def get_data_by_symbol_key(self, _symbol_key, _cut_timestamp, _end_timestamp='+', _limit=1000):
+    def get_data_by_symbol_key(self, _symbol_key, _cut_timestamp, _end_timestamp='+', _limit=NODE_LIMIT):
         pair, exchange, data_type = _symbol_key.split('|')
         labels = {'pair': pair, 'exchange': exchange, 'data_type': data_type}
         rsp = self.redis_cluster.get_batch_by_labels(0, _cut_timestamp, _end_timestamp, labels, _limit)
