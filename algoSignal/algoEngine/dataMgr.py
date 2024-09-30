@@ -19,7 +19,7 @@ from ..algoConfig.threadPoolConfig import pool
 
 
 class DataMgr:
-    NODE_LIMIT = 200
+    NODE_LIMIT = 500
 
     def __init__(self, _data_type):
         self.data_type = _data_type
@@ -36,18 +36,8 @@ class DataMgr:
 
     def get_all_data_by_symbol(self, _symbol, _start_ts, _end_ts):
         symbol_key = '{}|{}'.format(_symbol, self.data_type)
-        all_data = []
-        cut_timestamp = _start_ts
-        while True:
-            data = self.get_data_by_symbol_key(symbol_key, cut_timestamp)
-            if data[-1]['rank_timestamp'] > _end_ts:
-                all_data.extend([v for v in data if v['rank_timestamp'] <= _end_ts])
-                break
-            else:
-                all_data.extend(data)
-                cut_timestamp = data[-1]['rank_timestamp'] + 0.000001
-
-        return sorted(all_data, key=lambda x: x['rank_timestamp'])
+        data = self.get_data_by_symbol_key(symbol_key, _start_ts, _end_ts)
+        return self.format_node_data(data, _keep_all=True)
 
     def load_data(self, _symbols, _start_timestamp, _end_timestamp):
         logger.info('start receiving offline data')
@@ -71,7 +61,7 @@ class DataMgr:
         return self.ticks_q.get()
 
     @staticmethod
-    def format_node_data(_cluster_rsp):
+    def format_node_data(_cluster_rsp, _keep_all=False):
         all_data = []
         last_ts = float('inf')
         for info in _cluster_rsp.values():
@@ -96,17 +86,19 @@ class DataMgr:
             all_data.extend(data_list.values())
             last_ts = min(last_ts, cache_ts)
 
-        return sorted([v for v in all_data if v['rank_timestamp'] <= last_ts], key=lambda x: x['rank_timestamp'])
+        if _keep_all:
+            return sorted(all_data, key=lambda x: x['rank_timestamp'])
+        else:
+            return sorted([v for v in all_data if v['rank_timestamp'] <= last_ts], key=lambda x: x['rank_timestamp'])
 
-    def get_data_by_symbol_key(self, _symbol_key, _cut_timestamp, _end_timestamp='+', _limit=NODE_LIMIT):
+    def get_data_by_symbol_key(self, _symbol_key, _cut_timestamp, _end_timestamp='+', _limit=None):
         pair, exchange, data_type = _symbol_key.split('|')
         labels = {'pair': pair, 'exchange': exchange, 'data_type': data_type}
         rsp = self.redis_cluster.get_batch_by_labels(0, _cut_timestamp, _end_timestamp, labels, _limit)
         if rsp is None:
             logger.error('cluster node abnormal')
-            return []
 
-        return deque(self.format_node_data(rsp))
+        return rsp or []
 
     def load_batch_data(self, _q: Queue, _symbol_key, _start_timestamp, _end_timestamp):
         cut_timestamp = None
@@ -116,7 +108,8 @@ class DataMgr:
                     cut_timestamp = _start_timestamp
 
                 t1 = time.time()
-                data = self.get_data_by_symbol_key(_symbol_key, cut_timestamp, _end_timestamp)
+                raw = self.get_data_by_symbol_key(_symbol_key, cut_timestamp, _end_timestamp, self.NODE_LIMIT)
+                data = deque(self.format_node_data(raw))
                 t2 = time.time()
 
                 end_timestamp = data[-1]['rank_timestamp'] if data else 0
@@ -129,9 +122,9 @@ class DataMgr:
                     break
 
                 if len(data) < 1000:
-                    start_ts = data[-1]['rank_timestamp']
-                    left_data = self.get_data_by_symbol_key(_symbol_key, start_ts, _end_timestamp)
-                    _q.put(data + deque(left_data))
+                    start_ts = data[-1]['rank_timestamp'] + 0.000001
+                    raw = self.get_data_by_symbol_key(_symbol_key, start_ts, _end_timestamp, self.NODE_LIMIT)
+                    _q.put(data + deque(self.format_node_data(raw, _keep_all=True)))
                     logger.info('data over for {}'.format(_symbol_key))
                     _q.put(False)
                     break
