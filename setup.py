@@ -14,8 +14,5 @@ setup(
     author_email="jijingyuan@rookiequant.com",  # 作者邮箱
     description="research tools for signal analyzing in quantitative trading",  # 包的简短描述
     packages=find_packages(),  # 自动发现包目录
-    install_requires=[
-        'pandas',
-        'redis==5.0.8',
-    ],
+    install_requires=[],
 )
