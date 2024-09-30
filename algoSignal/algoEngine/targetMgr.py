@@ -6,11 +6,9 @@
 """
 import importlib
 
-import pandas as pd
-
+from algoUtils.dateUtil import timestamp_local_datetime
 from .dataMgr import DataMgr
 from ..algoConfig.loggerConfig import logger
-from algoUtils.dateUtil import timestamp_local_datetime
 
 
 class TargetMgr:
@@ -30,7 +28,7 @@ class TargetMgr:
         instance = cls_method(**_method_param)
         return instance
 
-    def handle_signals(self, _signals, _forward_window, _file_name):
+    def start_task(self, _signals, _forward_window):
         all_targets = []
         self.data_mgr.init_data_mgr()
         for signal in _signals:

@@ -10,8 +10,6 @@ import traceback
 from concurrent.futures import wait
 from itertools import groupby
 
-import pandas as pd
-
 from .dataMgr import DataMgr
 from ..algoConfig.loggerConfig import logger
 from ..algoConfig.threadPoolConfig import pool
@@ -65,8 +63,7 @@ class SignalMgr:
                     for data in current_data:
                         signals = self.signal_mgr.generate_signals([data]) or []
                         for signal in signals:
-                            self.check_fields(signal)
-                            adj_signals = {'signal_{}'.format(k): v for k, v in signal.items()}
+                            adj_signals = self.check_fields(signal)
                             self.signals.append({**adj_signals, 'signal_timestamp': data[-1]['rank_timestamp']})
 
                 else:
@@ -79,8 +76,7 @@ class SignalMgr:
 
                         signals = self.signal_mgr.generate_signals([v[1] for v in last_ticks]) or []
                         for signal in signals:
-                            self.check_fields(signal)
-                            adj_signals = {'signal_{}'.format(k): v for k, v in signal.items()}
+                            adj_signals = self.check_fields(signal)
                             self.signals.append({**adj_signals, 'signal_timestamp': cut_timestamp})
 
                         last_cut = cut_timestamp
@@ -94,8 +90,16 @@ class SignalMgr:
 
     @staticmethod
     def check_fields(_signal):
-        assert 'bind_id' in _signal
-        assert 'symbol' in _signal
-        assert 'action' in _signal
-        assert 'position' in _signal
-        assert 'executing_mod' in _signal
+        adj_signal = {}
+        default_keys = ['bind_id', 'symbol', 'action', 'position', 'executing_mod']
+        for field, v in _signal.items():
+            if field in default_keys:
+                adj_signal[field] = v
+            else:
+                adj_signal['signal_{}'.format(field)] = v
+
+        for key in default_keys:
+            if key not in adj_signal:
+                raise Exception('{} does not exist'.format(key))
+
+        return adj_signal
