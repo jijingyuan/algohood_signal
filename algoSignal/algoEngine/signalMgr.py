@@ -36,7 +36,7 @@ class SignalMgr:
         instance = cls_method(**_method_param)
         return instance
 
-    def start_task(self, _lag, _symbols, _start_timestamp, _end_timestamp, _file_name):
+    def start_task(self, _lag, _symbols, _start_timestamp, _end_timestamp):
         self.data_mgr.init_data_mgr()
         tasks = [
             pool.submit(self.data_mgr.load_data, *(_symbols, _start_timestamp, _end_timestamp)),
@@ -44,9 +44,7 @@ class SignalMgr:
         ]
 
         wait(tasks)
-
-        if self.signals:
-            pd.DataFrame(self.signals).to_csv('../algoFile/{}.csv'.format(_file_name))
+        return self.signals
 
     @staticmethod
     def reshape(_ticks, _lag):

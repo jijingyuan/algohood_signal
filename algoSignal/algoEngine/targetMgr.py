@@ -47,4 +47,4 @@ class TargetMgr:
 
             logger.info('{} finished'.format(timestamp_local_datetime(start_timestamp)))
 
-        pd.DataFrame(all_targets).to_csv('../algoFile/{}.csv'.format(_file_name))
+        return all_targets
