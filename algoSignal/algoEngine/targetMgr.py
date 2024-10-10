@@ -13,9 +13,9 @@ from ..algoConfig.loggerConfig import logger
 
 class TargetMgr:
 
-    def __init__(self, _method_name, _method_param, _data_type):
+    def __init__(self, _method_name, _method_param, _data_mgr):
         self.target_mgr = self.get_target_method(_method_name, _method_param)
-        self.data_mgr = DataMgr(_data_type)
+        self.data_mgr: DataMgr = _data_mgr
 
     @staticmethod
     def get_target_method(_method_name, _method_param):
@@ -30,7 +30,6 @@ class TargetMgr:
 
     def start_task(self, _signals, _forward_window):
         all_targets = []
-        self.data_mgr.init_data_mgr()
         for signal in _signals:
             symbol = signal['signal_symbol']
             start_timestamp = signal['signal_timestamp']

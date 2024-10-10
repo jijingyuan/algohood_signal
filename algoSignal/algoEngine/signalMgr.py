@@ -17,9 +17,9 @@ from ..algoConfig.threadPoolConfig import pool
 
 class SignalMgr:
 
-    def __init__(self, _method_name, _method_param, _data_type):
+    def __init__(self, _method_name, _method_param, _data_mgr):
         self.signal_mgr = self.get_signal_method(_method_name, _method_param)
-        self.data_mgr = DataMgr(_data_type)
+        self.data_mgr: DataMgr = _data_mgr
         self.cache = []
         self.signals = []
 
@@ -35,7 +35,6 @@ class SignalMgr:
         return instance
 
     def start_task(self, _lag, _symbols, _start_timestamp, _end_timestamp):
-        self.data_mgr.init_data_mgr()
         tasks = [
             pool.submit(self.data_mgr.load_data, *(_symbols, _start_timestamp, _end_timestamp)),
             pool.submit(self.handle_data, *(_lag,))
@@ -91,7 +90,7 @@ class SignalMgr:
     @staticmethod
     def check_fields(_signal):
         adj_signal = {}
-        default_keys = ['bind_id', 'symbol', 'action', 'position', 'executing_mod']
+        default_keys = ['bind_id', 'symbol', 'action', 'position', 'type']
         for field, v in _signal.items():
             if field in default_keys:
                 adj_signal[field] = v
