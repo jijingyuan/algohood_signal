@@ -6,6 +6,7 @@
 """
 import asyncio
 import importlib
+from tkinter import NO
 import traceback
 from typing import Optional
 from itertools import groupby
@@ -27,7 +28,7 @@ class SignalMgr:
         self.signals = []
         self.features = {}
         self.check_signals = {}
-        self.check_index = 1
+        self.signal_id = 1
 
     @staticmethod
     def get_signal_method(_method_name, _method_param) -> SignalBase:
@@ -72,33 +73,27 @@ class SignalMgr:
         return {k: list(v) for k, v in g}
 
     def handle_batch_data(self, _signal_ts, _signal_price, _data: dict):
+        features = {}
+        is_intercept = False
         if self.intercept_mgr is not None:
-            self.features = self.intercept_mgr.generate_features(_data) or {}
+            features = self.intercept_mgr.generate_features(_data) or {}
+            is_intercept = self.intercept_mgr.intercept_signal(features)
+
+            for signal_id in list(self.check_signals.keys()):
+                signal, features, is_intercept = self.check_signals[signal_id]
+                target = self.intercept_mgr.generate_target(signal_id, signal, _data)
+                if target is None:
+                    continue
+                
+                self.check_signals.pop(signal_id)
+                self.signals.append({**signal, **features, **target, 'intercept': is_intercept})
 
         signals = self.signal_mgr.generate_signals(_data) or []
         for signal in signals:
             self.check_fields(signal)
-            signal.update({**self.features, 'signal_timestamp': _signal_ts, 'signal_price': _signal_price})
-            self.check_signals[self.check_index] = signal
-            self.check_index += 1
-            if self.intercept_mgr is not None:
-                signal['intercept'] = self.intercept_mgr.intercept_signal(signal)
-
-            self.signals.append(signal)
-
-        if self.intercept_mgr is not None:
-            features_n_targets = []
-            for index in list(self.check_signals.keys()):
-                signal = self.check_signals[index]
-                target = self.intercept_mgr.generate_target(signal, _data)
-                if target is None:
-                    continue
-
-                signal.update(target)
-                features_n_targets.append(self.check_signals.pop(index))
-
-            if features_n_targets:
-                self.intercept_mgr.generate_model(features_n_targets)
+            signal.update({'signal_timestamp': _signal_ts, 'signal_price': _signal_price})
+            self.check_signals[self.signal_id] = [signal, features, is_intercept]
+            self.signal_id += 1
 
         return signals
 
