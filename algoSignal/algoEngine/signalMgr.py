@@ -6,7 +6,6 @@
 """
 import asyncio
 import importlib
-from tkinter import NO
 import traceback
 from typing import Optional
 from itertools import groupby
