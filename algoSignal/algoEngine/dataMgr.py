@@ -19,7 +19,7 @@ from ..algoConfig.redisConfig import host, port, is_localhost
 
 
 class DataMgr:
-    NODE_LIMIT = 500
+    NODE_LIMIT = 20000
 
     def __init__(self):
         self.config_redis = AsyncRedisClient(host, port)
@@ -155,7 +155,8 @@ class DataMgr:
                 if cut_timestamp is None:
                     cut_timestamp = _start_timestamp
 
-                raw = await self.get_data_by_symbol_key(symbol_key, cut_timestamp, _end_timestamp, self.NODE_LIMIT)
+                node_limit = int(self.NODE_LIMIT / len(self.redis_cluster.cluster.keys()))
+                raw = await self.get_data_by_symbol_key(symbol_key, cut_timestamp, _end_timestamp, node_limit)
                 data = deque(self.format_node_data(raw))
 
                 end_timestamp = data[-1][0] if data else 0
