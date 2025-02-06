@@ -133,10 +133,13 @@ class DataMgr:
         else:
             data = sorted([v for v in all_data if v[0] <= last_ts], key=lambda x: x[0])
 
-        start_dt = timestamp_local_datetime(data[0][0])
-        end_dt = timestamp_local_datetime(data[-1][0])
-        logger.info('sync {} to {}: {}'.format(start_dt, end_dt, len(data)))
+        if data:
+            start_dt = timestamp_local_datetime(data[0][0])
+            end_dt = timestamp_local_datetime(data[-1][0])
+            logger.info('sync {} to {}: {}'.format(start_dt, end_dt, len(data)))
+            
         return data
+
 
     async def get_data_by_symbol_key(self, _symbol_key, _cut_timestamp, _end_timestamp='+', _limit=None):
         pair, exchange, data_type = _symbol_key.split('|')

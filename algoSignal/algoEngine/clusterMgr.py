@@ -23,7 +23,7 @@ class RedisCluster:
         else:
             self.cluster.update({v: AsyncRedisClient(*v.decode().split(':')) for v in shard_ids.keys()})
 
-    async def get_batch_by_labels(self, _db, _start_ts, _end_ts, _labels: dict, _limit=None) -> {} or None:
+    async def get_batch_by_labels(self, _db, _start_ts, _end_ts, _labels: dict, _limit=None) -> dict | None:
         tasks = [v.get_ts_batch_by_labels(_db, _start_ts, _end_ts, _labels, _limit) for v in self.cluster.values()]
         rsp = await asyncio.gather(*tasks)
         if None in rsp:
